@@ -100,10 +100,10 @@ function buildTable(parts) {
 async function process() {
     alert("Button clicked");
     const boxes = [
-        box1.value,
-        box2.value,
-        box3.value,
-        box4.value
+        document.getElementById("box1").value,
+        document.getElementById("box2").value,
+        document.getElementById("box3").value,
+        document.getElementById("box4").value,
     ];
 
     const wb = new ExcelJS.Workbook();
@@ -204,5 +204,4 @@ async function process() {
     link.href = URL.createObjectURL(blob);
     link.download = "jbox_parts.xlsx";
     link.click();
-}
 }
