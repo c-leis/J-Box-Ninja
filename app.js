@@ -99,36 +99,140 @@ function buildTable(parts) {
 
 function process() {
 
-    let boxes = [
-        document.getElementById("box1").value,
-        document.getElementById("box2").value,
-        document.getElementById("box3").value,
-        document.getElementById("box4").value
+    const boxes = [
+        box1.value,
+        box2.value,
+        box3.value,
+        box4.value
     ];
 
     let wb = XLSX.utils.book_new();
-    let outputText = "";
 
     boxes.forEach((txt, i) => {
 
-        if (txt.trim()) {
+        if (!txt.trim()) return;
 
-            let norm = normalize(txt);
-            let parts = findParts(norm);
-            let rows = buildTable(parts);
+        let norm = normalize(txt);
+        let parts = findParts(norm);
+        let rows = buildTable(parts);
 
-            let ws = XLSX.utils.aoa_to_sheet([
-                ["PART","OPR","QTY","UOM","FIND"],
-                ...rows
-            ]);
+        let ws = {};
 
-            XLSX.utils.book_append_sheet(wb, ws, "JBOX" + (i+1));
+        // --------------------
+        // HEADER ROW
+        // --------------------
+        const headers = ["PART","OPR","QTY","UOM","FIND"];
 
-            outputText += `JBOX ${i+1}:\n` + JSON.stringify(parts, null, 2) + "\n\n";
-        }
+        headers.forEach((h, col) => {
+            let cellRef = XLSX.utils.encode_cell({ r: 4, c: col + 1 });
+
+            ws[cellRef] = {
+                v: h,
+                t: "s",
+                s: {
+                    fill: { fgColor: { rgb: "800080" } },
+                    font: { color: { rgb: "FFFFFF" }, bold: true },
+                    alignment: { horizontal: "center" }
+                }
+            };
+        });
+
+        // --------------------
+        // DATA ROWS
+        // --------------------
+        rows.forEach((row, r) => {
+            row.forEach((val, c) => {
+
+                let cellRef = XLSX.utils.encode_cell({
+                    r: r + 5,
+                    c: c + 1
+                });
+
+                ws[cellRef] = {
+                    v: val,
+                    t: typeof val === "number" ? "n" : "s",
+                    s: {
+                        alignment: (c >= 1 && c <= 4)
+                            ? { horizontal: "center" }
+                            : {}
+                    }
+                };
+            });
+        });
+
+        // --------------------
+        // COLUMN WIDTHS
+        // --------------------
+        ws["!cols"] = [
+            {}, // A (empty spacer)
+            { wch: 23 },
+            { wch: 9 },
+            { wch: 9 },
+            { wch: 9 },
+            { wch: 9 },
+            { wch: 9 },
+            { wch: 9 }
+        ];
+
+        // --------------------
+        // MERGES (WARNING BOX)
+        // --------------------
+        ws["!merges"] = [
+            // Warning block
+            {
+                s: { r: 4, c: 15 },
+                e: { r: 9, c: 18 }
+            },
+            // Info block
+            {
+                s: { r: 13, c: 15 },
+                e: { r: 16, c: 18 }
+            }
+        ];
+
+        // --------------------
+        // WARNING CELL
+        // --------------------
+        ws["P5"] = {
+            v: "VERIFY WIRE QTY & UOM",
+            t: "s",
+            s: {
+                fill: { fgColor: { rgb: "FF0000" } },
+                font: { bold: true },
+                alignment: {
+                    horizontal: "center",
+                    vertical: "center",
+                    wrapText: true
+                }
+            }
+        };
+
+        // --------------------
+        // INFO CELL
+        // --------------------
+        ws["P14"] = {
+            v: "Called out Wires are highlighted in the Wire Options table. Verify quantities and UOM.",
+            t: "s",
+            s: {
+                fill: { fgColor: { rgb: "FFFF00" } },
+                alignment: {
+                    wrapText: true,
+                    horizontal: "center",
+                    vertical: "center"
+                }
+            }
+        };
+
+        // --------------------
+        // RANGE
+        // --------------------
+        ws["!ref"] = XLSX.utils.encode_range({
+            s: { r: 0, c: 0 },
+            e: { r: rows.length + 20, c: 20 }
+        });
+
+        XLSX.utils.book_append_sheet(wb, ws, "JBOX" + (i+1));
     });
-
-    document.getElementById("output").innerText = outputText;
 
     XLSX.writeFile(wb, "jbox_parts.xlsx");
 }
