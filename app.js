@@ -230,11 +230,33 @@ async function process() {
             // WARNING
             ws.mergeCells("P5:S10");
             ws.getCell("P5").value = "VERIFY WIRE QTY & UOM";
+            ws.getCell("P5").fill = {
+                type: "pattern", 
+                pattern: "solid", 
+                fgColor: { argb: "FF0000" }
+            };
+
+            ws.getCell("P5").alignment = {
+                horizontal: "center",
+                vertical: "middle",
+                wrapText: true
+            }:
 
             // INFO
             ws.mergeCells("P14:S17");
             ws.getCell("P14").value =
                 "Highlighted wires shown in table.\nVerify qty + UOM.";
+            ws.getCell("P14").fill = {
+                type: "pattern", 
+                pattern: "solid", 
+                fgColor: { argb: "FFFF00" }
+            };
+
+            ws.getCell("P14").alignment = {
+                horizontal: "center",
+                vertical: "middle",
+                wrapText: true
+            }:
 
             addWireTable(ws, usedWires);
         }
