@@ -16,7 +16,6 @@ function breakerSize(part) {
 function partPriority(p) {
     if (p.startsWith("J-BOX")) return 0;
     if (p.startsWith("PLATE")) return 1;
-
     if (/^(CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER)/.test(p)) return 2;
     if (/^(TRANSFO|MECH|MOTOR)/.test(p)) return 3;
     if (p.startsWith("BLOCK")) return 4;
@@ -24,7 +23,6 @@ function partPriority(p) {
     if (/^(GFCI-OUTLET|BOX|PLATE25)/.test(p)) return 6;
     if (/^(GROUNDBAR|BRACKET|TERMINA)/.test(p)) return 7;
     if (p.startsWith("WIRE")) return 8;
-
     return 9;
 }
 
@@ -56,6 +54,7 @@ function findParts(text) {
         if (tok.startsWith("#")) tok = tok.replace("#", "");
         if (/^\d+A$/.test(tok)) return;
 
+        // Wires
         if (/^\d+\/0$/.test(tok)) {
             parts["WIRE_" + tok] = (parts["WIRE_" + tok] || 0) + 1;
             return;
@@ -66,7 +65,7 @@ function findParts(text) {
             return;
         }
 
-        let wireMap = {
+        const wireMap = {
             "2":["WIRE100"],
             "4":["WIRE102"],
             "6":["WIRE101"],
@@ -102,14 +101,11 @@ function buildTable(parts) {
 
     for (let part in parts) {
 
-        let row;
+        let row = part.startsWith("WIRE")
+            ? { part, opr:120, qty:"", uom:"FT", find:5040 }
+            : { part, opr:120, qty:parts[part], uom:"EA", find:5040 };
 
-        if (part.startsWith("WIRE")) {
-            usedWires.add(part);
-            row = { part, opr:120, qty:"", uom:"FT", find:5040 };
-        } else {
-            row = { part, opr:120, qty:parts[part], uom:"EA", find:5040 };
-        }
+        if (part.startsWith("WIRE")) usedWires.add(part);
 
         row.priority = partPriority(part);
         row.breaker = breakerSize(part);
@@ -117,7 +113,6 @@ function buildTable(parts) {
         rows.push(row);
     }
 
-    // ✅ SORT (matches Python)
     rows.sort((a, b) => {
         if (a.priority !== b.priority) return a.priority - b.priority;
         if (a.breaker !== b.breaker) return b.breaker - a.breaker;
@@ -128,7 +123,6 @@ function buildTable(parts) {
 }
 
 function addWireTable(ws, usedWires) {
-
     const wires = [
         ["WIRE_500MCM",""],["WIRE_400MCM",""],["WIRE_350MCM",""],["WIRE_300MCM",""],["WIRE_250MCM",""],
         ["WIRE_4/0","4/0"],["WIRE_3/0","3/0"],["WIRE_2/0","2/0"],["WIRE_1/0","1/0"],
@@ -143,21 +137,16 @@ function addWireTable(ws, usedWires) {
 
     let header = ws.getCell("I5");
     header.value = "WIRE OPTIONS";
-    header.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFFF00" } };
+    header.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFFFFF00" } };
     header.alignment = { horizontal:"center" };
     header.font = { bold:true };
-
-    const headers = ["PART","OPR","QTY","UOM","FIND","SIZE"];
-
-    headers.forEach((h,i) => {
-        ws.getRow(6).getCell(i+9).value = h;
-    });
 
     wires.forEach((w,i) => {
         let row = ws.getRow(7+i);
 
         row.getCell(9).value = w[0];
         row.getCell(10).value = 120;
+        row.getCell(11).value = "";
         row.getCell(12).value = "FT";
         row.getCell(13).value = 5040;
         row.getCell(14).value = w[1];
@@ -167,7 +156,7 @@ function addWireTable(ws, usedWires) {
                 row.getCell(c).fill = {
                     type:"pattern",
                     pattern:"solid",
-                    fgColor:{ argb:"00FF00" }
+                    fgColor:{ argb:"FF00FF00" }
                 };
             }
         }
@@ -175,7 +164,6 @@ function addWireTable(ws, usedWires) {
 }
 
 async function process() {
-
     try {
 
         const boxes = [
@@ -189,33 +177,25 @@ async function process() {
 
         for (let i=0;i<boxes.length;i++) {
 
-            let txt = boxes[i];
-            if (!txt.trim()) continue;
+            if (!boxes[i].trim()) continue;
 
-            let { rows, usedWires } = buildTable(findParts(normalize(txt)));
+            let { rows, usedWires } = buildTable(findParts(normalize(boxes[i])));
 
             let ws = wb.addWorksheet("JBOX"+(i+1));
 
-            ws.columns = [
-                {}, { width:23 }, { width:9 }, { width:9 }, { width:9 }, { width:9 }
-            ];
-
             // HEADER
             let headers = ["PART","OPR","QTY","UOM","FIND"];
-            let headerRow = ws.getRow(5);
-
             headers.forEach((h,i) => {
-                let cell = headerRow.getCell(i+2);
+                let cell = ws.getRow(5).getCell(i+2);
                 cell.value = h;
-                cell.fill = { type:"pattern", pattern:"solid", fgColor:{argb:"800080"} };
-                cell.font = { color:{argb:"FFFFFF"}, bold:true };
+                cell.fill = { type:"pattern", pattern:"solid", fgColor:{argb:"FF800080"} };
+                cell.font = { color:{argb:"FFFFFFFF"}, bold:true };
                 cell.alignment = { horizontal:"center" };
             });
 
             // DATA
             rows.forEach((r,idx) => {
                 let row = ws.getRow(6+idx);
-
                 row.getCell(2).value = r.part;
                 row.getCell(3).value = r.opr;
                 row.getCell(4).value = r.qty;
@@ -227,36 +207,27 @@ async function process() {
                 });
             });
 
-            // WARNING
+            // 🔴 WARNING BOX
             ws.mergeCells("P5:S10");
-            ws.getCell("P5").value = "VERIFY WIRE QTY & UOM";
-            ws.getCell("P5").fill = {
-                type: "pattern", 
-                pattern: "solid", 
-                fgColor: { argb: "FF0000" }
-            };
+            let warn = ws.getCell("P5");
 
-            ws.getCell("P5").alignment = {
-                horizontal: "center",
-                vertical: "middle",
-                wrapText: true
-            };
+            warn.value = "⚠ VERIFY WIRE QTY & UOM ⚠";
+            warn.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFFF0000" } };
+            warn.font = { bold:true, color:{ argb:"FF000000" }};
+            warn.alignment = { horizontal:"center", vertical:"middle", wrapText:true };
 
-            // INFO
+            // 🟡 INFO BOX
             ws.mergeCells("P14:S17");
-            ws.getCell("P14").value =
-                "Highlighted wires shown in table.\nVerify qty + UOM.";
-            ws.getCell("P14").fill = {
-                type: "pattern", 
-                pattern: "solid", 
-                fgColor: { argb: "FFFF00" }
-            };
+            let info = ws.getCell("P14");
 
-            ws.getCell("P14").alignment = {
-                horizontal: "center",
-                vertical: "middle",
-                wrapText: true
-            };
+            info.value =
+                "Called out Wires are Highlighted in the\n" +
+                "Wire Options table for easy reference.\n" +
+                "Please verify quantities and UOMs\n" +
+                "before ordering.";
+
+            info.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFFFFF00" } };
+            info.alignment = { horizontal:"center", vertical:"middle", wrapText:true };
 
             addWireTable(ws, usedWires);
         }
@@ -274,6 +245,6 @@ async function process() {
 
     } catch (err) {
         console.error(err);
-        alert("Error: " + err.message);
+        alert("ERROR: " + err.message);
     }
 }
