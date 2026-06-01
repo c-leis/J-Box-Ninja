@@ -97,7 +97,7 @@ function buildTable(parts) {
     return rows;
 }
 
-function process() {
+async function process() {
 
     const boxes = [
         box1.value,
@@ -106,133 +106,103 @@ function process() {
         box4.value
     ];
 
-    let wb = XLSX.utils.book_new();
+    const wb = new ExcelJS.Workbook();
 
-    boxes.forEach((txt, i) => {
+    for (let i = 0; i < boxes.length; i++) {
 
-        if (!txt.trim()) return;
+        let txt = boxes[i];
+        if (!txt.trim()) continue;
 
         let norm = normalize(txt);
         let parts = findParts(norm);
         let rows = buildTable(parts);
 
-        let ws = {};
+        let ws = wb.addWorksheet("JBOX" + (i+1));
 
-        // --------------------
-        // HEADER ROW
-        // --------------------
+        // Column widths (match your Python)
+        ws.columns = [
+            {}, // spacer
+            { width: 23 },
+            { width: 9 },
+            { width: 9 },
+            { width: 9 },
+            { width: 9 }
+        ];
+
+        // Header row (Row 5)
         const headers = ["PART","OPR","QTY","UOM","FIND"];
+        let headerRow = ws.getRow(5);
 
-        headers.forEach((h, col) => {
-            let cellRef = XLSX.utils.encode_cell({ r: 4, c: col + 1 });
-
-            ws[cellRef] = {
-                v: h,
-                t: "s",
-                s: {
-                    fill: { fgColor: { rgb: "800080" } },
-                    font: { color: { rgb: "FFFFFF" }, bold: true },
-                    alignment: { horizontal: "center" }
-                }
+        headers.forEach((h, i) => {
+            let cell = headerRow.getCell(i+2);
+            cell.value = h;
+            cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "800080" }
             };
+            cell.font = { color: { argb: "FFFFFF" }, bold: true };
+            cell.alignment = { horizontal: "center" };
         });
 
-        // --------------------
-        // DATA ROWS
-        // --------------------
+        // Data rows
         rows.forEach((row, r) => {
+            let excelRow = ws.getRow(r + 6);
+
             row.forEach((val, c) => {
+                let cell = excelRow.getCell(c + 2);
+                cell.value = val;
 
-                let cellRef = XLSX.utils.encode_cell({
-                    r: r + 5,
-                    c: c + 1
-                });
-
-                ws[cellRef] = {
-                    v: val,
-                    t: typeof val === "number" ? "n" : "s",
-                    s: {
-                        alignment: (c >= 1 && c <= 4)
-                            ? { horizontal: "center" }
-                            : {}
-                    }
-                };
+                if (c >= 1 && c <= 4) {
+                    cell.alignment = { horizontal: "center" };
+                }
             });
         });
 
-        // --------------------
-        // COLUMN WIDTHS
-        // --------------------
-        ws["!cols"] = [
-            {}, // A (empty spacer)
-            { wch: 23 },
-            { wch: 9 },
-            { wch: 9 },
-            { wch: 9 },
-            { wch: 9 },
-            { wch: 9 },
-            { wch: 9 }
-        ];
+        // WARNING BLOCK (same as Python)
+        ws.mergeCells("P5:S10");
+        let warningCell = ws.getCell("P5");
 
-        // --------------------
-        // MERGES (WARNING BOX)
-        // --------------------
-        ws["!merges"] = [
-            // Warning block
-            {
-                s: { r: 4, c: 15 },
-                e: { r: 9, c: 18 }
-            },
-            // Info block
-            {
-                s: { r: 13, c: 15 },
-                e: { r: 16, c: 18 }
-            }
-        ];
-
-        // --------------------
-        // WARNING CELL
-        // --------------------
-        ws["P5"] = {
-            v: "VERIFY WIRE QTY & UOM",
-            t: "s",
-            s: {
-                fill: { fgColor: { rgb: "FF0000" } },
-                font: { bold: true },
-                alignment: {
-                    horizontal: "center",
-                    vertical: "center",
-                    wrapText: true
-                }
-            }
+        warningCell.value = "⚠ VERIFY WIRE QTY & UOM ⚠";
+        warningCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FF0000" }
         };
-
-        // --------------------
-        // INFO CELL
-        // --------------------
-        ws["P14"] = {
-            v: "Called out Wires are highlighted in the Wire Options table. Verify quantities and UOM.",
-            t: "s",
-            s: {
-                fill: { fgColor: { rgb: "FFFF00" } },
-                alignment: {
-                    wrapText: true,
-                    horizontal: "center",
-                    vertical: "center"
-                }
-            }
+        warningCell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true
         };
+        warningCell.font = { bold: true };
 
-        // --------------------
-        // RANGE
-        // --------------------
-        ws["!ref"] = XLSX.utils.encode_range({
-            s: { r: 0, c: 0 },
-            e: { r: rows.length + 20, c: 20 }
-        });
+        // INFO BLOCK
+        ws.mergeCells("P14:S17");
+        let infoCell = ws.getCell("P14");
 
-        XLSX.utils.book_append_sheet(wb, ws, "JBOX" + (i+1));
+        infoCell.value =
+            "Called out wires are highlighted in the wire table.\nVerify quantities and UOM.";
+        infoCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFFF00" }
+        };
+        infoCell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true
+        };
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+
+    const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     });
 
-    XLSX.writeFile(wb, "jbox_parts.xlsx");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "jbox_parts.xlsx";
+    link.click();
+}
 }
