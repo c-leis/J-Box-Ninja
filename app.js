@@ -98,7 +98,7 @@ function buildTable(parts) {
 }
 
 async function process() {
-
+    alert("Button clicked");
     const boxes = [
         box1.value,
         box2.value,
