@@ -85,18 +85,92 @@ function findParts(text) {
 
 function buildTable(parts) {
     let rows = [];
+    let usedWires = new Set();
 
     for (let part in parts) {
         if (part.startsWith("WIRE")) {
-            rows.push([part, 120, "", "FT", 5040]);
+            usedWires.add(part);
+
+            rows.push({
+                part,
+                opr: 120,
+                qty: "",
+                uom: "FT",
+                find: 5040
+            });
         } else {
-            rows.push([part, 120, parts[part], "EA", 5040]);
+            rows.push({
+                part,
+                opr: 120,
+                qty: parts[part],
+                uom: "EA",
+                find: 5040
+            });
         }
     }
 
-    return rows;
+    return { rows, usedWires };
 }
+function addWireTable(ws, usedWires) {
 
+    const wires = [
+        ["WIRE_500MCM",""],["WIRE_400MCM",""],["WIRE_350MCM",""],["WIRE_300MCM",""],["WIRE_250MCM",""],
+        ["WIRE_4/0","4/0"],["WIRE_3/0","3/0"],["WIRE_2/0","2/0"],["WIRE_1/0","1/0"],
+        ["WIRE103","#1"],["WIRE116","#1 Green"],["WIRE100","#2"],["WIRE107","#2 Green"],
+        ["WIRE102","#4"],["WIRE109","#4 Green"],["WIRE101","#6"],["WIRE110","#6 Green"],
+        ["WIRE30","#8"],["WIRE39","#8 Green"],["WIRE35","#10"],["WIRE36","#10 Green"],
+        ["WIRE47","#12"],["WIRE50","#12 Green"],["WIRE106","#12 White"],
+        ["WIRE29","#14 Black"],["WIRE44","#14 White"],["WIRE45","#14 Green"]
+    ];
+
+    // Header merge (same as Python)
+    ws.mergeCells("I5:N5");
+
+    let header = ws.getCell("I5");
+    header.value = "WIRE OPTIONS";
+    header.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFF00" }
+    };
+    header.font = { bold: true };
+    header.alignment = { horizontal: "center" };
+
+    const headers = ["PART","OPR","QTY","UOM","FIND","SIZE"];
+
+    headers.forEach((h, i) => {
+        let cell = ws.getRow(6).getCell(i + 9);
+        cell.value = h;
+    });
+
+    let rowStart = 7;
+
+    wires.forEach((row, r) => {
+        let excelRow = ws.getRow(r + 6);
+
+       
+    excelRow.getCell(2).value = row.part;
+    excelRow.getCell(3).value = row.opr;
+    excelRow.getCell(4).value = row.qty;
+    excelRow.getCell(5).value = row.uom;
+    excelRow.getCell(6).value = row.find;
+
+    [3,4,5,6].forEach(c => {
+        excelRow.getCell(c).alignment = { horizontal: "center" };
+    addWireTable(ws, usedWires);
+
+        // ✅ GREEN HIGHLIGHT if used
+        if (usedWires.has(w[0])) {
+            for (let c = 9; c <= 14; c++) {
+                row.getCell(c).fill = {
+                    type: "pattern",
+                    pattern: "solid",
+                    fgColor: { argb: "00FF00" }
+                };
+            }
+        }
+    });
+}
 async function process() {
     alert("Button clicked");
     const boxes = [
@@ -115,7 +189,7 @@ async function process() {
 
         let norm = normalize(txt);
         let parts = findParts(norm);
-        let rows = buildTable(parts);
+        let { rows, usedWires } = buildTable(parts);
 
         let ws = wb.addWorksheet("JBOX" + (i+1));
 
