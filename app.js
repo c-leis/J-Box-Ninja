@@ -132,4 +132,3 @@ function process() {
 
     XLSX.writeFile(wb, "jbox_parts.xlsx");
 }
-``
