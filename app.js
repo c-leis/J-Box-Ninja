@@ -240,7 +240,7 @@ async function process() {
                 horizontal: "center",
                 vertical: "middle",
                 wrapText: true
-            }:
+            };
 
             // INFO
             ws.mergeCells("P14:S17");
@@ -256,7 +256,7 @@ async function process() {
                 horizontal: "center",
                 vertical: "middle",
                 wrapText: true
-            }:
+            };
 
             addWireTable(ws, usedWires);
         }
