@@ -3,7 +3,7 @@ function normalize(text) {
     t = t.replace(/&AMP;/g, "&");
 
     t = t.replace(/CB\s*(\d+)([-A-Z]*)/g, "CIRCUITBRK$1$2");
-    t = t.replace(/CIRCUITBRK\s+(\d+)/g, "CIRCUITBRK$1");
+    t = t.replace(/CIRCUITBRK\s+(\d+[A-Z]*)/g, "CIRCUITBRK$1");
     t = t.replace(/TRANSF(\d+)/g, "TRANSFO$1");
 
     return t.replace(/\s+/g, " ");
