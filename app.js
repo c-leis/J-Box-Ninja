@@ -2,9 +2,13 @@ function normalize(text) {
     let t = text.toUpperCase();
     t = t.replace(/&AMP;/g, "&");
 
-    t = t.replace(/CB\s*(\d+)([-A-Z0-9]*)/g, "CIRCUITBRK$1$2");
+    t = t.replace(/CIRCUIBRK/g, "CIRCUITBRK");
+    t = t.replace(/CB[-\s]*(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
+    t = t.replace(/CB[-\s]*(\d+)\s+([A-Z0-9-]+)/g, "CIRCUITBRK$1$2");
+    t = t.replace(/CIRCUIT\s*BRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
+    t = t.replace(/CIRCUITBRK\s+(\d+)\s+([A-Z0-9-]+)/g, "CIRCUITBRK$1$2");
     t = t.replace(/CIRCUITBRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
-    t = t.replace(/\b(\d+)\s*MCM\b/g, "$1MCM");
+    t = t.replace(/\b#?(\d+)\s*MCM\b/g, "$1MCM");
     t = t.replace(/TRANSF(\d+)/g, "TRANSFO$1");
 
     return t.replace(/\s+/g, " ");
@@ -37,63 +41,145 @@ function findParts(text) {
     text = text.replace(/\b\d+\s*[xX]\s*#?\d+\b/g, "");
     text = text.replace(/\b\d+\s*A\b/g, "");
 
-    for (let m of text.matchAll(/\((\d+)\)([A-Z0-9_\-/]+)/g)) {
-        if (/^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(m[2])) continue;
-        parts[m[2]] = (parts[m[2]] || 0) + parseInt(m[1]);
-        qtyParts.add(m[2]);
-    }
-
-    for (let m of text.matchAll(/([A-Z0-9_\-/]+)\s*\((\d+)\)/g)) {
-        if (/^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(m[1])) continue;
-        parts[m[1]] = (parts[m[1]] || 0) + parseInt(m[2]);
-        qtyParts.add(m[1]);
-    }
-
-    let tokens = text.match(/#?[A-Z0-9_\-/]+/g) || [];
+    const wireMap = {
+        "2":["WIRE100"],
+        "4":["WIRE102"],
+        "6":["WIRE101"],
+        "8":["WIRE30"],
+        "10":["WIRE35"],
+        "12":["WIRE47"],
+        "14":["WIRE29","WIRE44","WIRE45"]
+    };
+    const mapWireToken = (tok) => {
+        tok = tok.replace(/^#/g, "");
+        if (/^\d+MCM$/.test(tok)) return "WIRE_" + tok;
+        if (wireMap[tok]) return tok;
+        return null;
+    };
+    const normalizeToken = (tok) => tok.startsWith("#") ? tok.slice(1) : tok;
+    const isPartToken = (tok) => /^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|BOX|GFCI-OUTLET|PLATE25|GROUNDBAR|BRACKET|TERMINA)/.test(tok);
     const ignoreQtyToken = (tok) => /^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(tok);
 
-    for (let tok of tokens) {
-        if (qtyParts.has(tok) || ignoreQtyToken(tok)) continue;
+    let tokens = text.match(/#?\d+MCM|\(\d+\)|[A-Z0-9_\-/]+/g) || [];
+    for (let i = 0; i < tokens.length; ) {
+        let tok = tokens[i];
 
-        if (tok.startsWith("#")) tok = tok.replace("#", "");
-        if (/^\d+A$/.test(tok)) continue;
+        if (/^\(\d+\)$/.test(tok)) {
+            let qty = parseInt(tok.slice(1, -1), 10);
+            let next = tokens[i + 1];
+            let prev = tokens[i - 1];
 
-        // Wires
-        if (/^\d+\/0$/.test(tok)) {
-            parts["WIRE_" + tok] = (parts["WIRE_" + tok] || 0) + 1;
+            if (next && (isPartToken(next) || mapWireToken(next))) {
+                let normalizedNext = normalizeToken(next);
+                let wireKey = mapWireToken(next);
+                if (wireKey) {
+                    if (wireMap[wireKey]) {
+                        wireMap[wireKey].forEach(w => {
+                            parts[w] = (parts[w] || 0) + qty;
+                        });
+                    } else {
+                        parts[wireKey] = (parts[wireKey] || 0) + qty;
+                    }
+                } else {
+                    parts[next] = (parts[next] || 0) + qty;
+                }
+                qtyParts.add(normalizedNext);
+                i += 2;
+                continue;
+            }
+
+            if (prev && (isPartToken(prev) || mapWireToken(prev))) {
+                let normalizedPrev = normalizeToken(prev);
+                let wireKey = mapWireToken(prev);
+                if (wireKey) {
+                    if (wireMap[wireKey]) {
+                        wireMap[wireKey].forEach(w => {
+                            parts[w] = (parts[w] || 0) + qty;
+                        });
+                    } else {
+                        parts[wireKey] = (parts[wireKey] || 0) + qty;
+                    }
+                } else {
+                    parts[prev] = (parts[prev] || 0) + qty;
+                }
+                qtyParts.add(normalizedPrev);
+            }
+            i++;
             continue;
         }
 
-        if (/^\d+MCM$/.test(tok)) {
-            parts["WIRE_" + tok] = (parts["WIRE_" + tok] || 0) + 1;
+        let normalizedTok = normalizeToken(tok);
+        if (qtyParts.has(normalizedTok) || ignoreQtyToken(tok)) {
+            i++;
             continue;
         }
 
-        const wireMap = {
-            "2":["WIRE100"],
-            "4":["WIRE102"],
-            "6":["WIRE101"],
-            "8":["WIRE30"],
-            "10":["WIRE35"],
-            "12":["WIRE47"],
-            "14":["WIRE29","WIRE44","WIRE45"]
-        };
+        if (/^\d+A$/.test(tok)) {
+            i++;
+            continue;
+        }
 
-        if (wireMap[tok]) {
-            wireMap[tok].forEach(w => {
-                parts[w] = (parts[w] || 0) + 1;
-            });
+        let next = tokens[i + 1];
+        if ((isPartToken(tok) || mapWireToken(tok)) && next && /^\(\d+\)$/.test(next)) {
+            let qty = parseInt(next.slice(1, -1), 10);
+            let next2 = tokens[i + 2];
+            if (next2 && (isPartToken(next2) || mapWireToken(next2))) {
+                let wireKey = mapWireToken(tok);
+                if (wireKey) {
+                    if (wireMap[wireKey]) {
+                        wireMap[wireKey].forEach(w => {
+                            parts[w] = (parts[w] || 0) + 1;
+                        });
+                    } else {
+                        parts[wireKey] = (parts[wireKey] || 0) + 1;
+                    }
+                } else {
+                    parts[tok] = (parts[tok] || 0) + 1;
+                }
+                i++;
+                continue;
+            }
+
+            let wireKey = mapWireToken(tok);
+            if (wireKey) {
+                if (wireMap[wireKey]) {
+                    wireMap[wireKey].forEach(w => {
+                        parts[w] = (parts[w] || 0) + qty;
+                    });
+                } else {
+                    parts[wireKey] = (parts[wireKey] || 0) + qty;
+                }
+            } else {
+                parts[tok] = (parts[tok] || 0) + qty;
+            }
+            qtyParts.add(normalizedTok);
+            i += 2;
+            continue;
+        }
+
+        let wireKey = mapWireToken(tok);
+        if (wireKey) {
+            if (wireMap[wireKey]) {
+                wireMap[wireKey].forEach(w => {
+                    parts[w] = (parts[w] || 0) + 1;
+                });
+            } else {
+                parts[wireKey] = (parts[wireKey] || 0) + 1;
+            }
+            i++;
             continue;
         }
 
         if (tok === "FUSE24") {
             parts[tok] = (parts[tok] || 0) + 2;
+            i++;
             continue;
         }
 
-        if (/^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|BOX|GFCI-OUTLET|PLATE25|GROUNDBAR|BRACKET|TERMINA)/.test(tok)) {
+        if (isPartToken(tok)) {
             parts[tok] = (parts[tok] || 0) + 1;
         }
+        i++;
     }
 
     return parts;
