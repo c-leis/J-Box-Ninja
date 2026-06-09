@@ -3,6 +3,7 @@ function normalize(text) {
     t = t.replace(/&AMP;/g, "&");
 
     t = t.replace(/CB\s*(\d+)([-A-Z]*)/g, "CIRCUITBRK$1$2");
+    t = t.replace(/CIRCUITBRK\s+(\d+)/g, "CIRCUITBRK$1");
     t = t.replace(/TRANSF(\d+)/g, "TRANSFO$1");
 
     return t.replace(/\s+/g, " ");
@@ -47,22 +48,33 @@ function findParts(text) {
 
     let tokens = text.match(/[A-Z0-9_\-/]+/g) || [];
 
-    tokens.forEach(tok => {
+    for (let i = 0; i < tokens.length; i++) {
+        let tok = tokens[i];
 
-        if (qtyParts.has(tok)) return;
+        if (/^\d+$/.test(tok) && i + 1 < tokens.length) {
+            let next = tokens[i + 1];
+            if (/^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|BOX|GFCI-OUTLET|PLATE25|GROUNDBAR|BRACKET|TERMINA)/.test(next)) {
+                parts[next] = (parts[next] || 0) + parseInt(tok);
+                qtyParts.add(next);
+                i++;
+                continue;
+            }
+        }
+
+        if (qtyParts.has(tok)) continue;
 
         if (tok.startsWith("#")) tok = tok.replace("#", "");
-        if (/^\d+A$/.test(tok)) return;
+        if (/^\d+A$/.test(tok)) continue;
 
         // Wires
         if (/^\d+\/0$/.test(tok)) {
             parts["WIRE_" + tok] = (parts["WIRE_" + tok] || 0) + 1;
-            return;
+            continue;
         }
 
         if (/^\d+MCM$/.test(tok)) {
             parts["WIRE_" + tok] = (parts["WIRE_" + tok] || 0) + 1;
-            return;
+            continue;
         }
 
         const wireMap = {
@@ -79,18 +91,18 @@ function findParts(text) {
             wireMap[tok].forEach(w => {
                 parts[w] = (parts[w] || 0) + 1;
             });
-            return;
+            continue;
         }
 
         if (tok === "FUSE24") {
             parts[tok] = (parts[tok] || 0) + 2;
-            return;
+            continue;
         }
 
         if (/^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|BOX|GFCI-OUTLET|PLATE25|GROUNDBAR|BRACKET|TERMINA)/.test(tok)) {
             parts[tok] = (parts[tok] || 0) + 1;
         }
-    });
+    }
 
     return parts;
 }
