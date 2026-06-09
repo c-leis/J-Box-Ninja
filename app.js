@@ -2,8 +2,9 @@ function normalize(text) {
     let t = text.toUpperCase();
     t = t.replace(/&AMP;/g, "&");
 
-    t = t.replace(/CB\s*(\d+)([-A-Z]*)/g, "CIRCUITBRK$1$2");
-    t = t.replace(/CIRCUITBRK\s+(\d+[A-Z]*)/g, "CIRCUITBRK$1");
+    t = t.replace(/CB\s*(\d+)([-A-Z0-9]*)/g, "CIRCUITBRK$1$2");
+    t = t.replace(/CIRCUITBRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
+    t = t.replace(/\b(\d+)\s*MCM\b/g, "$1MCM");
     t = t.replace(/TRANSF(\d+)/g, "TRANSFO$1");
 
     return t.replace(/\s+/g, " ");
@@ -37,31 +38,22 @@ function findParts(text) {
     text = text.replace(/\b\d+\s*A\b/g, "");
 
     for (let m of text.matchAll(/\((\d+)\)([A-Z0-9_\-/]+)/g)) {
+        if (/^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(m[2])) continue;
         parts[m[2]] = (parts[m[2]] || 0) + parseInt(m[1]);
         qtyParts.add(m[2]);
     }
 
     for (let m of text.matchAll(/([A-Z0-9_\-/]+)\s*\((\d+)\)/g)) {
+        if (/^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(m[1])) continue;
         parts[m[1]] = (parts[m[1]] || 0) + parseInt(m[2]);
         qtyParts.add(m[1]);
     }
 
-    let tokens = text.match(/[A-Z0-9_\-/]+/g) || [];
+    let tokens = text.match(/#?[A-Z0-9_\-/]+/g) || [];
+    const ignoreQtyToken = (tok) => /^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(tok);
 
-    for (let i = 0; i < tokens.length; i++) {
-        let tok = tokens[i];
-
-        if (/^\d+$/.test(tok) && i + 1 < tokens.length) {
-            let next = tokens[i + 1];
-            if (/^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|BOX|GFCI-OUTLET|PLATE25|GROUNDBAR|BRACKET|TERMINA)/.test(next)) {
-                parts[next] = (parts[next] || 0) + parseInt(tok);
-                qtyParts.add(next);
-                i++;
-                continue;
-            }
-        }
-
-        if (qtyParts.has(tok)) continue;
+    for (let tok of tokens) {
+        if (qtyParts.has(tok) || ignoreQtyToken(tok)) continue;
 
         if (tok.startsWith("#")) tok = tok.replace("#", "");
         if (/^\d+A$/.test(tok)) continue;
