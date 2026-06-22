@@ -337,6 +337,12 @@ async function process() {
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = jobName ? `${jobName}_parts.xlsx` : "jbox_parts.xlsx";
+        if (typeof gtag === "function") {
+    gtag('event', 'excel_download', {
+        event_category: 'JBOX',
+        event_label: jobName || 'Unnamed Job'
+    });
+}
         link.click();
 
     } catch (err) {
