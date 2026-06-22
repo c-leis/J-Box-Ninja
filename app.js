@@ -21,6 +21,7 @@ function breakerSize(part) {
 
 function partPriority(p) {
     if (p.startsWith("J-BOX")) return 0;
+    if (p.startsWith("PLATE25_GFCI")) return 6;  // Group convenience outlet plate with GFCI parts
     if (p.startsWith("PLATE")) return 1;
     if (/^(CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER)/.test(p)) return 2;
     if (/^(TRANSFO|MECH|MOTOR)/.test(p)) return 3;
@@ -42,6 +43,8 @@ function findParts(text) {
     text = text.replace(/\b\d+\s*A\b/g, "");
 
     const wireMap = {
+        "4/0":["WIRE_4/0"],
+        "1/0":["WIRE_1/0"],
         "2":["WIRE100"],
         "4":["WIRE102"],
         "6":["WIRE101"],
@@ -53,6 +56,7 @@ function findParts(text) {
     const mapWireToken = (tok) => {
         tok = tok.replace(/^#/g, "");
         if (/^\d+MCM$/.test(tok)) return "WIRE_" + tok;
+        if (tok === "4/0" || tok === "1/0") return tok;
         if (wireMap[tok]) return tok;
         return null;
     };
@@ -256,6 +260,7 @@ function addWireTable(ws, usedWires) {
 async function process() {
     try {
 
+        const jobName = document.getElementById("jobName").value.trim();
         const boxes = [
             document.getElementById("box1").value,
             document.getElementById("box2").value,
@@ -271,7 +276,8 @@ async function process() {
 
             let { rows, usedWires } = buildTable(findParts(normalize(boxes[i])));
 
-            let ws = wb.addWorksheet("JBOX"+(i+1));
+            let sheetName = jobName ? `${jobName}_JBOX${i+1}` : `JBOX${i+1}`;
+            let ws = wb.addWorksheet(sheetName);
 
             // HEADER
             let headers = ["PART","OPR","QTY","UOM","FIND"];
@@ -330,7 +336,7 @@ async function process() {
 
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "jbox_parts.xlsx";
+        link.download = jobName ? `${jobName}_parts.xlsx` : "jbox_parts.xlsx";
         link.click();
 
     } catch (err) {
