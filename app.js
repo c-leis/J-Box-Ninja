@@ -8,6 +8,7 @@ function normalize(text) {
     t = t.replace(/CIRCUIT\s*BRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
     t = t.replace(/CIRCUITBRK\s+(\d+)\s+([A-Z0-9-]+)/g, "CIRCUITBRK$1$2");
     t = t.replace(/CIRCUITBRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
+    t = t.replace(/SHEILD\s+(\d+(?:[-A-z0-9]+)?)/g, "SHIELD$1");
     t = t.replace(/\b#?(\d+)\s*MCM\b/g, "$1MCM");
     t = t.replace(/TRANSF(\d+)/g, "TRANSFO$1");
 
@@ -21,16 +22,17 @@ function breakerSize(part) {
 
 function partPriority(p) {
     if (p.startsWith("J-BOX")) return 0;
-    if (p.startsWith("PLATE25_GFCI")) return 6;  // Group convenience outlet plate with GFCI parts
+    if (p.startsWith("PLATE25_GFCI")) return 7;  // Group convenience outlet plate with GFCI parts
     if (p.startsWith("PLATE")) return 1;
-    if (/^(CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER)/.test(p)) return 2;
-    if (/^(TRANSFO|MECH|MOTOR)/.test(p)) return 3;
-    if (p.startsWith("BLOCK")) return 4;
-    if (/^(SHAFT|FUSE)/.test(p)) return 5;
-    if (/^(GFCI-OUTLET|GFCI-30MA-ALT|BOX|PLATE25)/.test(p)) return 6;
-    if (/^(GROUNDBAR|BRACKET|TERMINA|TERM_COV_XT1|RING_KIT)/.test(p)) return 7;
-    if (p.startsWith("WIRE")) return 8;
-    return 9;
+    if (p.startsWith("SHIELD")) return 2;
+    if (/^(CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER)/.test(p)) return 3;
+    if (/^(TRANSFO|MECH|MOTOR)/.test(p)) return 4;
+    if (p.startsWith("BLOCK")) return 5;
+    if (/^(SHAFT|FUSE)/.test(p)) return 6;
+    if (/^(GFCI-OUTLET|GFCI-30MA-ALT|BOX|PLATE25)/.test(p)) return 7;
+    if (/^(GROUNDBAR|BRACKET|TERMINA|TERM_COV_XT1|RING_KIT)/.test(p)) return 8;
+    if (p.startsWith("WIRE")) return 9;
+    return 10;
 }
 
 function findParts(text) {
@@ -61,7 +63,7 @@ function findParts(text) {
         return null;
     };
     const normalizeToken = (tok) => tok.startsWith("#") ? tok.slice(1) : tok;
-    const isPartToken = (tok) => /^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|BOX|GFCI-OUTLET|GFCI-30MA-ALT|PLATE25|GROUNDBAR|BRACKET|TERMINA|TERM_COV_XT1|RING_KIT)/.test(tok);
+    const isPartToken = (tok) => /^(J-BOX|PLATE|CIRCUITBRK|LUG|LOCK|ROTARY|HANDLE|COVER|TRANSFO|MECH|MOTOR|BLOCK|FUSE|SHAFT|SHIELD|BOX|GFCI-OUTLET|GFCI-30MA-ALT|PLATE25|GROUNDBAR|BRACKET|TERMINA|TERM_COV_XT1|RING_KIT)/.test(tok);
     const ignoreQtyToken = (tok) => /^(WHT|BLK|RED|GRN|YEL|ORG|BRN|PNK|H\d+)$/i.test(tok);
 
     let tokens = text.match(/#?\d+MCM|\(\d+\)|[A-Z0-9_\-/]+/g) || [];
