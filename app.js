@@ -8,7 +8,7 @@ function normalize(text) {
     t = t.replace(/CIRCUIT\s*BRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
     t = t.replace(/CIRCUITBRK\s+(\d+)\s+([A-Z0-9-]+)/g, "CIRCUITBRK$1$2");
     t = t.replace(/CIRCUITBRK\s+(\d+(?:[-A-Z0-9]+)?)/g, "CIRCUITBRK$1");
-    t = t.replace(/SHEILD\s+(\d+(?:[-A-z0-9]+)?)/g, "SHIELD$1");
+    t = t.replace(/SHIELD\s+(\d+(?:[-A-z0-9]+)?)/g, "SHIELD$1");
     t = t.replace(/\b#?(\d+)\s*MCM\b/g, "$1MCM");
     t = t.replace(/TRANSF(\d+)/g, "TRANSFO$1");
 
